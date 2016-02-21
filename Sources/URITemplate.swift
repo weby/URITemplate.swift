@@ -188,7 +188,11 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
         let endIndex = expression.endIndex.predecessor()
         return self.regexForExpression(expression.substringWithRange(startIndex..<endIndex))
       } else {
+#if os(Linux)
+        return expression
+#else
         return NSRegularExpression.escapedPatternForString(expression)
+#endif
       }
     }
 
@@ -202,8 +206,7 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
   /// Extract the variables used in a given URL
   public func extract(url:String) -> [String:String]? {
     if let expression = extractionRegex {
-      let input = url as NSString
-      let range = NSRange(location: 0, length: input.length)
+      let range = NSRange(location: 0, length: url.characters.count)
       let results = expression.matchesInString(url, options: NSMatchingOptions(rawValue: 0), range: range)
 
       if let result = results.first {
@@ -211,7 +214,7 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
 
         for (index, variable) in variables.enumerate() {
           let range = result.rangeAtIndex(index + 1)
-          let value = input.substringWithRange(range).stringByRemovingPercentEncoding
+          let value = NSString(string: url).substringWithRange(range).stringByRemovingPercentEncoding
           extractedVariables[variable] = value
         }
 
@@ -232,27 +235,25 @@ public func ==(lhs:URITemplate, rhs:URITemplate) -> Bool {
 
 extension NSRegularExpression {
   func substitute(string:String, block:((String) -> (String))) -> String {
-    let oldString = string as NSString
-    let range = NSRange(location: 0, length: oldString.length)
-    var newString = string as NSString
+    let range = NSRange(location: 0, length: string.characters.count)
+    var newString = string
 
     let matches = matchesInString(string, options: NSMatchingOptions(rawValue: 0), range: range)
     for match in Array(matches.reverse()) {
-      let expression = oldString.substringWithRange(match.range)
+      let expression = NSString(string: string).substringWithRange(match.range)
       let replacement = block(expression)
-      newString = newString.stringByReplacingCharactersInRange(match.range, withString: replacement)
+      newString = NSString(string: newString).stringByReplacingCharactersInRange(match.range, withString: replacement)
     }
 
     return newString as String
   }
 
   func matches(string:String) -> [String] {
-    let input = string as NSString
-    let range = NSRange(location: 0, length: input.length)
+    let range = NSRange(location: 0, length: string.characters.count)
     let results = matchesInString(string, options: NSMatchingOptions(rawValue: 0), range: range)
 
     return results.map { result -> String in
-      return input.substringWithRange(result.range)
+      return NSString(string: string).substringWithRange(result.range)
     }
   }
 }
