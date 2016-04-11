@@ -102,7 +102,7 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
   public var variables:[String] {
     let expressions = regex.matches(template).map { expression in
       // Removes the { and } from the expression
-      expression.substringWithRange(expression.startIndex.successor()..<expression.endIndex.predecessor())
+      expression.substring(with: expression.startIndex.successor()..<expression.endIndex.predecessor())
     }
     
     return expressions.map { expression -> [String] in
@@ -111,15 +111,15 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
       for op in self.operators {
         if let op = op.op {
           if expression.hasPrefix(op) {
-            expression = expression.substringFromIndex(expression.startIndex.successor())
+            expression = expression.substring(from: expression.startIndex.successor())
             break
           }
         }
       }
       
-      return expression.componentsSeparatedByString(",").map { component in
+      return expression.componentsSeparated(by: ",").map { component in
         if component.hasSuffix("*") {
-          return component.substringToIndex(component.endIndex.predecessor())
+          return component.substring(to: component.endIndex.predecessor())
         } else {
           return component
         }
@@ -130,8 +130,8 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
   /// Expand template as a URI Template using the given variables
   public func expand(variables:[String:AnyObject]) -> String {
     return regex.substitute(template) { string in
-      var expression = string.substringWithRange(string.startIndex.successor()..<string.endIndex.predecessor())
-      let firstCharacter = expression.substringToIndex(expression.startIndex.successor())
+      var expression = string[string.startIndex.successor()..<string.endIndex.predecessor()]
+      let firstCharacter = expression.substring(to: expression.startIndex.successor())
       
       var op = self.operators.filter {
         if let op = $0.op {
@@ -142,24 +142,24 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
         }.first
       
       if (op != nil) {
-        expression = expression.substringFromIndex(expression.startIndex.successor())
+        expression = expression.substring(to: expression.startIndex.successor())
       } else {
         op = self.operators.first
       }
       
-      let rawExpansions = expression.componentsSeparatedByString(",").map { vari -> String? in
+      let rawExpansions = expression.componentsSeparated(by: ",").map { vari -> String? in
         var variable = vari
         var prefix:Int?
         
-        if let range = variable.rangeOfString(":") {
-          prefix = Int(variable.substringFromIndex(range.endIndex))
-          variable = variable.substringToIndex(range.startIndex)
+        if let range = variable.range(of: ":") {
+          prefix = Int(variable.substring(from: range.endIndex))
+          variable = variable.substring(to: range.startIndex)
         }
         
         let explode = variable.hasSuffix("*")
         
         if explode {
-          variable = variable.substringToIndex(variable.endIndex.predecessor())
+          variable = variable.substring(to: variable.endIndex.predecessor())
         }
         
         if let value:AnyObject = variables[variable] {
@@ -201,10 +201,10 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
       }.first
     
     if op != nil {
-      expression = expression.substringWithRange(expression.startIndex.successor()..<expression.endIndex)
+      expression = expression.substring(with: expression.startIndex.successor()..<expression.endIndex)
     }
     
-    let regexes = expression.componentsSeparatedByString(",").map { variable -> String in
+    let regexes = expression.componentsSeparated(by: ",").map { variable -> String in
       return self.regexForVariable(variable, op: op)
     }
     return regexes.joined(separator: (op ?? StringExpansion()).joiner)
@@ -217,9 +217,9 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
       if expression.hasPrefix("{") && expression.hasSuffix("}") {
         let startIndex = expression.startIndex.successor()
         let endIndex = expression.endIndex.predecessor()
-        return self.regexForExpression(expression.substringWithRange(startIndex..<endIndex))
+        return self.regexForExpression(expression.substring(with: startIndex..<endIndex))
       } else {
-        return NSRegularExpression.escapedPatternForString(expression)
+        return NSRegularExpression.escapedPattern(for: expression)
       }
     }
     
@@ -235,14 +235,14 @@ public struct URITemplate : CustomStringConvertible, Equatable, Hashable, String
     if let expression = extractionRegex {
       let input = NSString(string: url)
       let range = NSRange(location: 0, length: input.length)
-      let results = expression.matchesInString(url, options: NSMatchingOptions(rawValue: 0), range: range)
+      let results = expression.matches(in: url, options: NSMatchingOptions(rawValue: 0), range: range)
       
       if let result = results.first {
         var extractedVariables = Dictionary<String, String>()
         
         for (index, variable) in variables.enumerated() {
-          let range = result.rangeAtIndex(index + 1)
-          let value = input.substringWithRange(range).stringByRemovingPercentEncoding
+          let range = result.range(at: index + 1)
+          let value = input.substring(with: range).removingPercentEncoding
           extractedVariables[variable] = value
         }
         
@@ -267,11 +267,11 @@ extension NSRegularExpression {
     let range = NSRange(location: 0, length: oldString.length)
     var newString = NSString(string: string)
     
-    let matches = matchesInString(string, options: NSMatchingOptions(rawValue: 0), range: range)
+    let matches = self.matches(in: string, options: NSMatchingOptions(rawValue: 0), range: range)
     for match in Array(matches.reversed()) {
-      let expression = oldString.substringWithRange(match.range)
+      let expression = oldString.substring(with: match.range)
       let replacement = block(expression)
-      newString = NSString(string: newString.stringByReplacingCharactersInRange(match.range, withString: replacement))
+      newString = NSString(string: newString.replacingCharacters(in: match.range, with: replacement))
     }
     
     return String(newString)
@@ -280,18 +280,18 @@ extension NSRegularExpression {
   func matches(string:String) -> [String] {
     let input = NSString(string: string)
     let range = NSRange(location: 0, length: input.length)
-    let results = matchesInString(string, options: NSMatchingOptions(rawValue: 0), range: range)
+    let results = matches(in: string, options: NSMatchingOptions(rawValue: 0), range: range)
     
     return results.map { result -> String in
-      return input.substringWithRange(result.range)
+      return input.substring(with: result.range)
     }
   }
 }
 
 extension String {
   func percentEncoded() -> String {
-    let allowedCharacters = NSCharacterSet(charactersInString: ":/?&=;+!@#$()',* ").invertedSet
-    return stringByAddingPercentEncodingWithAllowedCharacters(allowedCharacters)!
+    let allowedCharacters = NSCharacterSet(charactersIn: ":/?&=;+!@#$()',* ").inverted
+    return addingPercentEncoding(withAllowedCharacters: allowedCharacters)!
   }
 }
 
@@ -339,7 +339,7 @@ class BaseOperator {
     if let prefix = prefix {
       if value.characters.count > prefix {
         let index = value.startIndex.advanced(by: prefix, limit: value.endIndex)
-        return expand(value: value.substringToIndex(index))
+        return expand(value: value.substring(to: index))
       }
     }
     
@@ -389,7 +389,7 @@ class ReservedExpansion : BaseOperator, Operator {
   override var joiner:String { return "," }
   
   override func expand(value  value:String) -> String {
-    return value.stringByAddingPercentEncodingWithAllowedCharacters(NSCharacterSet.URLQueryAllowedCharacterSet())!
+    return value.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlQueryAllowed())!
   }
 }
 
@@ -400,7 +400,7 @@ class FragmentExpansion : BaseOperator, Operator {
   override var joiner:String { return "," }
   
   override func expand(value  value:String) -> String {
-    return value.stringByAddingPercentEncodingWithAllowedCharacters(NSCharacterSet.URLFragmentAllowedCharacterSet())!
+    return value.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlFragmentAllowed())!
   }
 }
 
@@ -429,8 +429,8 @@ class PathSegmentExpansion : BaseOperator, Operator {
   var prefix:String { return "/" }
   override var joiner:String { return "/" }
   
-  override func expand(value  value:String) -> String {
-    return value.stringByAddingPercentEncodingWithAllowedCharacters(NSCharacterSet.URLPathAllowedCharacterSet())!
+  override func expand(value value:String) -> String {
+    return value.addingPercentEncoding(withAllowedCharacters: NSCharacterSet.urlPathAllowed())!
   }
   
   override func expand(variable  variable:String, value:[AnyObject], explode:Bool) -> String? {
